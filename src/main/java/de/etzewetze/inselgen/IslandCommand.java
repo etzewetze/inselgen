@@ -1,6 +1,7 @@
 package de.etzewetze.inselgen;
 
 import de.etzewetze.inselgen.terrain.IslandStyle;
+import de.etzewetze.inselgen.terrain.TreeType;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -31,8 +32,9 @@ final class IslandCommand implements TabExecutor {
         if (args.length == 0 || args[0].equalsIgnoreCase("help") || args[0].equalsIgnoreCase("hilfe")) {
             info(sender, "/skyinsel <50-500> [Seed] [natuerlich|bergig|flach] [biome:beach]");
             info(sender, "Beispiele: /skyinsel 300 biome:beach | /skyinsel 300 32 bergig biome:beach");
+            info(sender, "Vegetation: [tree:auto|palm|birch|…] [trees:0-100] [plants:0-100] [lakes:0-8] [ores:true|false]");
             info(sender, "Die Insel entsteht um deine Position. Fliege vorher in freien Luftraum.");
-            info(sender, "/skyinsel status | /skyinsel cancel | /skyinsel biomes | /skyinsel undo | /skyinsel reload");
+            info(sender, "/skyinsel status | /skyinsel cancel | /skyinsel biomes | /skyinsel trees | /skyinsel undo | /skyinsel reload");
             return true;
         }
         if (args[0].equalsIgnoreCase("status") && args.length == 1) {
@@ -47,6 +49,10 @@ final class IslandCommand implements TabExecutor {
         if (args[0].equalsIgnoreCase("biomes") && args.length <= 2) {
             String search = args.length == 2 ? args[1].toLowerCase(Locale.ROOT) : "";
             info(sender, String.join(", ", service.biomes().stream().filter(key -> key.contains(search)).toList()));
+            return true;
+        }
+        if (args[0].equalsIgnoreCase("trees") && args.length == 1) {
+            info(sender, "Baumarten: " + String.join(", ", treeNames()));
             return true;
         }
         if (args[0].equalsIgnoreCase("undo") && args.length == 1) {
@@ -67,10 +73,11 @@ final class IslandCommand implements TabExecutor {
             return true;
         }
         try {
-            GenerationSettings settings = plugin.settings();
+            var configuration = plugin.configuration();
+            GenerationSettings settings = configuration.settings();
             GenerationArguments request = GenerationArguments.parse(args, settings.minimumSize(), settings.maximumSize(),
                     () -> ThreadLocalRandom.current().nextLong());
-            service.start(player, request, settings);
+            service.start(player, request, settings, configuration.trees());
         } catch (IllegalArgumentException | IllegalStateException error) {
             error(sender, error.getMessage());
         }
@@ -82,18 +89,36 @@ final class IslandCommand implements TabExecutor {
         if (!sender.hasPermission("inselgen.generate")) return List.of();
         List<String> suggestions = new ArrayList<>();
         if (args.length == 1) {
-            suggestions.addAll(List.of("50", "100", "150", "200", "300", "500", "help", "status", "cancel", "undo", "biomes"));
+            suggestions.addAll(List.of("50", "100", "150", "200", "300", "500", "help", "status", "cancel", "undo", "biomes", "trees"));
             if (sender.hasPermission("inselgen.admin")) suggestions.add("reload");
-        } else if (args.length >= 2 && args.length <= 4) {
+        } else if (args.length >= 2 && args.length <= 9 && args[0].matches("[0-9]+")) {
             boolean alreadyHasStyle = Arrays.stream(args, 1, args.length - 1).anyMatch(arg -> IslandStyle.parse(arg).isPresent());
             if (!alreadyHasStyle) for (IslandStyle style : IslandStyle.values()) suggestions.add(style.token());
             boolean alreadyHasBiome = Arrays.stream(args, 1, args.length - 1).anyMatch(arg -> arg.toLowerCase(Locale.ROOT).startsWith("biome:"));
             if (!alreadyHasBiome) for (String key : service.biomes()) {
                 suggestions.add("biome:" + (key.startsWith("minecraft:") ? key.substring(10) : key));
             }
+            for (String name : treeNames()) suggestOption(suggestions, args, "tree:" + name);
+            for (int density : new int[]{0, 10, 30, 50, 75, 100}) {
+                suggestOption(suggestions, args, "trees:" + density);
+                suggestOption(suggestions, args, "plants:" + density);
+            }
+            for (int count = 0; count <= 8; count++) suggestOption(suggestions, args, "lakes:" + count);
+            suggestOption(suggestions, args, "ores:true"); suggestOption(suggestions, args, "ores:false");
         }
         String prefix = args.length == 0 ? "" : args[args.length - 1].toLowerCase(Locale.ROOT);
         return suggestions.stream().filter(suggestion -> suggestion.startsWith(prefix)).toList();
+    }
+
+    private List<String> treeNames() {
+        List<String> names = new ArrayList<>(Arrays.stream(TreeType.values()).filter(t -> t != TreeType.CUSTOM).map(TreeType::token).toList());
+        names.addAll(plugin.configuration().trees().names());
+        return names;
+    }
+
+    private static void suggestOption(List<String> suggestions, String[] args, String option) {
+        String key = option.substring(0, option.indexOf(':') + 1);
+        if (Arrays.stream(args, 1, args.length - 1).noneMatch(a -> a.toLowerCase(Locale.ROOT).startsWith(key))) suggestions.add(option);
     }
 
     static void info(CommandSender sender, String message) {
