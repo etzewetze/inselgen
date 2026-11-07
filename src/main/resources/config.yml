@@ -2,6 +2,10 @@
 minimum-size: 50
 maximum-size: 500
 
+# auto: FAWE auf unterstützten Servern, ansonsten native Platzierung.
+# Auf Folia wird immer die native Platzierung verwendet. Änderungen benötigen Neustart.
+placement-backend: auto
+
 # Verhindert das Überschreiben bestehender Blöcke im gesamten geplanten Bauvolumen.
 # Auch Wasser, Pflanzen und Gebäude zählen als belegt. Nach der Prüfung können
 # andere Plugins/Spieler den Bereich weiterhin verändern; nicht parallel bauen.

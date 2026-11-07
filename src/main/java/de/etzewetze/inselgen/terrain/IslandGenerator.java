@@ -19,6 +19,11 @@ public final class IslandGenerator {
 
     public IslandPlan generate(int size, int baseY, long seed, IslandStyle style,
                                boolean trees, boolean plants, BooleanSupplier cancelled) {
+        return generate(size, baseY, seed, style, trees, plants, BiomeProfile.DEFAULT, cancelled);
+    }
+
+    public IslandPlan generate(int size, int baseY, long seed, IslandStyle style,
+                               boolean trees, boolean plants, BiomeProfile biome, BooleanSupplier cancelled) {
         if (size < 50 || size > 500) throw new IllegalArgumentException("Größe muss zwischen 50 und 500 liegen");
         if (baseY < -4096 || baseY > 4096) throw new IllegalArgumentException("Ungültige Basishöhe");
         SplittableRandom random = new SplittableRandom(seed);
@@ -101,7 +106,8 @@ public final class IslandGenerator {
                     if (xx >= 0 && zz >= 0 && xx < size && zz < size && bottoms[zz * size + xx] != Integer.MIN_VALUE)
                         slope = Math.max(slope, Math.abs(tops[i] - tops[zz * size + xx]));
                 }
-                if (style == IslandStyle.BERGIG && tops[i] > baseY + mountainHeight * 0.60 && slope <= 2) surfaces[i] = SNOW;
+                if (biome != BiomeProfile.DEFAULT) surfaces[i] = IslandPlan.Surface.valueOf(biome.name());
+                else if (style == IslandStyle.BERGIG && tops[i] > baseY + mountainHeight * 0.60 && slope <= 2) surfaces[i] = SNOW;
                 else surfaces[i] = slope >= 3 ? ROCK : GRASS;
             }
         }

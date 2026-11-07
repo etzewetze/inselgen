@@ -4,8 +4,8 @@ import java.util.List;
 
 /** Compact height maps: even a 500-block island does not keep millions of block objects. */
 public final class IslandPlan {
-    public enum BlockKind { STONE, ANDESITE, DIRT, GRASS_BLOCK, SNOW_BLOCK, OAK_LOG, OAK_LEAVES, SHORT_GRASS, POPPY }
-    public enum Surface { GRASS, ROCK, SNOW }
+    public enum BlockKind { STONE, ANDESITE, DIRT, GRASS_BLOCK, SNOW_BLOCK, SAND, SANDSTONE, RED_SAND, TERRACOTTA, MYCELIUM, OAK_LOG, OAK_LEAVES, SHORT_GRASS, POPPY }
+    public enum Surface { GRASS, ROCK, SNOW, SAND, RED_SAND, MYCELIUM }
     public record Decoration(int x, int y, int z, BlockKind kind) { }
     public record Column(int bottom, int top, Surface surface) {
         public int height() { return top - bottom + 1; }
@@ -13,6 +13,12 @@ public final class IslandPlan {
         public BlockKind blockAt(int y) {
             if (y < bottom || y > top) throw new IllegalArgumentException("Block außerhalb der Säule");
             if (surface == Surface.ROCK) return y >= top - 1 ? BlockKind.ANDESITE : BlockKind.STONE;
+            if (surface == Surface.SAND || surface == Surface.RED_SAND) {
+                if (y >= top - 2) return surface == Surface.SAND ? BlockKind.SAND : BlockKind.RED_SAND;
+                if (y >= top - 5) return surface == Surface.SAND ? BlockKind.SANDSTONE : BlockKind.TERRACOTTA;
+                return BlockKind.STONE;
+            }
+            if (surface == Surface.MYCELIUM && y == top) return BlockKind.MYCELIUM;
             if (y == top) return surface == Surface.SNOW ? BlockKind.SNOW_BLOCK : BlockKind.GRASS_BLOCK;
             return y >= top - 3 ? BlockKind.DIRT : BlockKind.STONE;
         }

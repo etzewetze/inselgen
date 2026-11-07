@@ -1,65 +1,91 @@
 # InselGen
 
-Ein Plugin für **Paper 26.3**, das mit einem Befehl eine neue, natürlich geformte Himmelsinsel erzeugt. Jede Insel bekommt einen Zufallsseed: ovale, gedrehte Umrisse, Einbuchtungen, Hügel oder Berge und eine unregelmäßige, nach unten zulaufende Felsunterseite. Auf geeigneten Flächen wachsen kleine Eichen, Gras und Blumen.
+Natürliche, zufällige Himmelsinseln für **Spigot, Paper und Folia ab Minecraft 1.21**. Ein Befehl erzeugt ovale, gedrehte Umrisse mit Einbuchtungen, Hügeln oder Bergen und einer nach unten zulaufenden Felsunterseite. Geeignete Grasflächen bekommen kleine Eichen und Pflanzen. Optional lässt sich das Biom auswählen:
 
 ```text
-/skyinsel 150
+/skyinsel 300 biome:beach
+/skyinsel 300 32 bergig biome:beach
 ```
 
-Die Insel entsteht **um deine aktuelle X-/Z-Position**. Deine Fußhöhe minus einen Block ist die ungefähre Basishöhe der Oberfläche; Berge können darüber hinausragen und die Unterseite reicht nach unten. Fliege zuerst in freien Luftraum, beispielsweise ungefähr auf Y=180 bis Y=210. Der tatsächlich benötigte Höhenbereich wird vor dem Bauen berechnet und geprüft.
+## Installation und Kompatibilität
 
-## Installation
-
-Voraussetzungen:
-
-- Paper **26.3** und **Java 25**.
-- FastAsyncWorldEdit **2.16.2**. Als Abhängigkeit installieren; InselGen enthält keine eigene FAWE-Kopie.
-- VoxelSniper ist optional und kann danach zum Nachbearbeiten benutzt werden.
-
-1. Die Datei `inselgen-0.1.0.jar` in den Ordner `plugins/` legen.
+1. `inselgen-0.2.0.jar` in `plugins/` legen. Beim Aktualisieren die alte InselGen-JAR ersetzen.
 2. Den Server vollständig neu starten.
-3. Als OP im Spiel `/skyinsel 100` ausprobieren.
+3. Als OP im Spiel in freien Luftraum fliegen und `/skyinsel 100` ausprobieren.
 
-Die JAR liegt nach einem erfolgreichen Build unter `target/inselgen-0.1.0.jar`. GitHub Actions baut und testet Pull Requests sowie Änderungen an `main`; die JAR wird beim erfolgreichen Lauf als Artefakt **InselGen** angeboten. Im jeweiligen Actions-Lauf das Artefakt herunterladen und die JAR aus der ZIP entnehmen.
+Die JAR wird gegen die **Spigot-API 1.21** für **Java 21** gebaut. Neuere Server behalten ihre eigene Java-Anforderung, beispielsweise Java 25 für Minecraft 26.3. FAWE ist optional und wird nicht mitgeliefert.
+
+| Plattform | Platzierung im Modus `auto` | Rückgängig |
+| --- | --- | --- |
+| Spigot / Paper mit aktiviertem, passendem FAWE | FAWE | `//undo` oder `/skyinsel undo` |
+| Spigot / Paper ohne FAWE | Native Bukkit-Platzierung | `/skyinsel undo` |
+| Folia | Native Platzierung über den jeweiligen Regionscheduler | `/skyinsel undo` |
+
+Auf Folia wird normales FAWE nicht benötigt oder verwendet. Auf anderen Servern muss eine installierte FAWE-Version zur jeweiligen Minecraft-Version passen. Die FAWE-Anbindung kompiliert gegen API 2.11.2; der aktuelle Paper-26.3-Test verwendet FAWE 2.16.2.
+
+Die automatisierten Builds laufen mit Java 21. Nach `mvn verify` liegt die JAR unter `target/inselgen-0.2.0.jar`. GitHub Actions bietet sie im erfolgreichen Lauf als Artefakt **InselGen** an.
 
 ## Befehle
 
 | Befehl | Ergebnis |
 | --- | --- |
-| `/skyinsel 150` | Neue natürliche Insel, zufälliger Seed |
-| `/skyinsel 200 bergig` | Insel mit stärkerem Gebirge und teils verschneiten Gipfeln |
-| `/skyinsel 100 flach` | Weitgehend ebene, leicht unregelmäßige Oberfläche |
-| `/skyinsel 150 731` | Natürliche Insel mit dem Seed `731` |
-| `/skyinsel 200 731 bergig` | Bestimmter Seed und bergiger Stil |
-| `/skyinsel status` | Fortschritt, Größe und Seed des aktuellen Auftrags |
-| `/skyinsel cancel` | Eigenen Auftrag abbrechen; bereits gesetzte Blöcke bleiben bis zum Undo bestehen |
-| `/skyinsel reload` | Konfiguration neu laden; erfordert `inselgen.admin` |
+| `/skyinsel 150` | Natürliche Insel mit neuem Zufallsseed |
+| `/skyinsel 200 bergig` | Stärkeres Gebirge, normalerweise mit teils verschneiten Gipfeln |
+| `/skyinsel 100 flach` | Weitgehend ebene Oberfläche |
+| `/skyinsel 150 731` | Insel mit festem Seed `731` |
+| `/skyinsel 300 biome:beach` | Neue zufällige Insel mit Beach-Biom und sandigem Boden |
+| `/skyinsel 300 32 bergig biome:beach` | Größe, Seed, Stil und Biom kombinieren |
+| `/skyinsel 150 biome:minecraft:birch_forest` | Vollständigen Biomschlüssel verwenden |
+| `/skyinsel biomes [Suche]` | Verfügbare Biome des laufenden Servers anzeigen |
+| `/skyinsel status` | Aktuellen Fortschritt anzeigen |
+| `/skyinsel cancel` | Eigenen Auftrag abbrechen |
+| `/skyinsel undo` | Letzten Auftrag rückgängig machen; bei FAWE wird dessen Undo aufgerufen |
+| `/skyinsel reload` | Konfiguration neu laden |
 | `/skyinsel help` | Kurzhilfe |
-| `//undo` | Die letzte FAWE-Änderung rückgängig machen |
 
-`/inselgen` ist ein Alias für `/skyinsel`. Seed und Stil dürfen auch in umgekehrter Reihenfolge stehen. Ein Seed ist eine vorzeichenbehaftete 64-Bit-Ganzzahl. Ohne Angabe wird bei jedem Aufruf ein neuer gewählt und im Chat sowie im Serverlog angezeigt.
+`/inselgen` ist ein Alias. Seed, Stil und `biome:...` können in beliebiger Reihenfolge nach der Größe stehen. Die Tab-Vervollständigung bietet Biome an. Ohne Biomoption bleiben die vorhandenen Biomdaten unverändert. Nicht vorhandene Biome werden vor dem Bauen abgewiesen; neue Biome stehen erst zur Verfügung, wenn die Serverversion bzw. ihr Datapack sie registriert.
 
-Die Größe **50–500** ist die maximale horizontale Ausdehnung des Inselkörpers in Blöcken, **kein Radius**. Durch die natürliche Form fällt die tatsächliche Breite etwas kleiner aus; Länge und Breite können unterschiedlich sein. Bäume werden innerhalb der Inselränder platziert. Die genaue Form ist bei identischem Seed, gleicher Größe, gleichem Stil und gleicher Pluginversion reproduzierbar. Vegetation kann separat abgeschaltet werden, ohne die Landschaft zu ändern.
+**Ein fester Seed wiederholt die Form.** Ohne Zahl entsteht bei jedem Aufruf ein neuer Seed, der im Chat und Serverlog angezeigt wird. Die Form ist bei gleicher Pluginversion, Größe, gleichem Seed und Stil reproduzierbar. Die Größe 50–500 ist die maximale horizontale Ausdehnung, kein Radius; natürliche Inseln sind etwas kleiner und unterschiedlich lang und breit.
 
-## Bestehende Bauten und Rückgängig
+Die Insel entsteht um deine aktuelle X-/Z-Position. Deine Fußhöhe minus einen Block ist die ungefähre Basishöhe; Berge reichen darüber und die Unterseite darunter. Beispielsweise auf Y=200 ausprobieren. Der notwendige Höhenbereich wird vor dem Bauen geprüft. Nach erfolgreichem Bau wirst du standardmäßig auf die baumfreie Mitte gesetzt, sofern du noch in derselben Welt bist; Folia verwendet dafür asynchrones Teleportieren.
 
-Standardmäßig prüft InselGen **alle geplanten Blockpositionen einschließlich Vegetation**, bevor es den ersten Block setzt. Ist eine Position bereits belegt, wird der Auftrag ohne Bau abgebrochen und die Koordinate angezeigt. Auch Wasser und Pflanzen gelten als belegt. Weltgrenze, Bauhöhe und Blocklimit werden ebenfalls vor dem Bauen geprüft.
+## Biome und Oberflächen
 
-Die Prüfung reserviert den Bereich nicht gegen andere Spieler oder Plugins. Während eines Auftrags dort keine parallelen Änderungen durchführen. FAWE-Gebietsrechte und Limits gelten weiterhin; eine Ablehnung während des Setzens kann eine teilweise gebaute Insel hinterlassen.
+Die Option setzt die **echten dreidimensionalen Biomdaten**, nicht nur die Blockfarben. Zusätzlich passen ausgewählte Biomfamilien den Boden an:
 
-Änderungen werden in der **FAWE-Historie des ausführenden Spielers** gespeichert, auch nach einem Abbruch während des Setzens. Erst nach Abschluss des Auftrags `//undo` benutzen. Dieser Befehl betrifft immer die letzte FAWE-Änderung des Spielers, deshalb zwischen Inselbau und Undo keine andere WorldEdit-Operation starten. FAWE muss Historie zulassen; insbesondere darf das History-Limit des Spielers nicht `0` sein. Wie lange Historie erhalten bleibt und ob sie einen Neustart überlebt, hängt von der FAWE-Konfiguration ab.
+| Biomfamilie | Boden |
+| --- | --- |
+| `beach`, `desert` | Sand mit Sandstein darunter |
+| `*badlands*` | Roter Sand mit Terrakotta |
+| `snowy_*`, `frozen_*`, `ice_spikes` | Schneeblöcke |
+| `mushroom_fields` | Myzel |
+| Andere Biome | Normales Inselgelände mit dem gewählten Biom |
 
-Es läuft höchstens ein Inselauftrag gleichzeitig. Berechnung, Prüfung und FAWE-Blockänderungen laufen auf einem eigenen Worker. FAWE kann für große Inseln trotzdem deutlich RAM, CPU und Datenträger beanspruchen; die Laufzeit hängt auch von Chunk-Laden, Beleuchtung und History-Einstellungen ab. Es gibt keine feste Laufzeit- oder Lag-Garantie.
+Es handelt sich um InselGen-Gelände, keine vollständige Kopie der Vanilla-Weltgenerierung eines Bioms. Auf Sand, Schnee und Myzel werden keine Eichen oder Grasbüschel erzeugt. Hügel und Inselumriss bleiben durch Seed und Stil bestimmt.
 
-Nach erfolgreichem Bau wirst du standardmäßig auf die baumfreie Inselmitte gesetzt, sofern du noch in derselben Welt bist. Das lässt sich abschalten.
+Biomdaten werden in 4×4×4-Zellen gespeichert. Verändert werden Zellen der Inselspalten von der Unterseite bis acht Blöcke über der Oberfläche, begrenzt durch die Bauhöhe. An Rändern reicht eine Änderung deshalb bis zur jeweiligen Zellgrenze. Undo schließt diese Biomänderungen ein.
 
-## Einstellungen
+## Schutz, Abbruch und Undo
 
-Beim ersten Start entsteht `plugins/InselGen/config.yml`:
+Vor dem ersten Block werden Weltgrenze, Bauhöhe und Blocklimit geprüft. Standardmäßig müssen **alle geplanten Positionen einschließlich Vegetation frei** sein. Auch Wasser, Pflanzen und Gebäude zählen als belegt. Die Prüfung reserviert den Bereich nicht gegen parallele Änderungen durch Spieler oder andere Plugins.
+
+Die native Platzierung erfordert immer `require-empty-space: true` und zusätzlich `inselgen.native` (standardmäßig OP). Sie besitzt keine WorldGuard-/PlotSquared-Anbindung und ist für vertrauenswürdige Builder gedacht. Die FAWE-Platzierung verwendet den ausführenden Spieler und die von FAWE vorgesehenen Limits und Gebietsrechte; nur dort ist Überschreiben mit `require-empty-space: false` möglich.
+
+Es läuft ein Insel- oder nativer Undo-Auftrag gleichzeitig. `/skyinsel cancel` stoppt einen Auftrag; bereits gesetzte Teile bleiben zunächst bestehen und lassen sich nach Abschluss rückgängig machen.
+
+- **FAWE:** Änderungen einschließlich Biomdaten landen in der FAWE-Historie des Spielers. `//undo` betrifft dessen letzte FAWE-Änderung, deshalb dazwischen keine andere WorldEdit-Operation starten. FAWE muss Historie zulassen; ein History-Limit von `0` verhindert Undo. Aufbewahrung und Neustartverhalten bestimmt FAWE.
+- **Native:** Die letzte gebaute Insel pro Spieler wird komprimiert unter `plugins/InselGen/native-history/` protokolliert. `/skyinsel undo` stellt die vorherigen Blöcke und Biomdaten wieder her. Positionen, die inzwischen anders verändert wurden, werden übersprungen. Das Protokoll ist auch nach einem regulären Neustart lesbar. Bei Abbruch eines Undo kann derselbe Befehl fortgesetzt werden. Nach erfolgreichem Undo wird das Protokoll entfernt; beim nächsten Bau wird das vorherige ersetzt. Es gibt kein natives Redo.
+
+Berechnung und native Dateizugriffe laufen auf einem Worker. Native Weltänderungen werden in begrenzten Portionen auf dem Serverthread bzw. auf Folias zuständigem Regionsthread ausgeführt; Spieleraktionen laufen auf ihrem Entity-Scheduler. FAWE arbeitet über seine eigene asynchrone API. Große Inseln benötigen je nach Backend, Chunk-Laden, Beleuchtung und Hardware deutlich Zeit und Arbeitsspeicher. Die native Platzierung kann bei Größe 500 mehrere Minuten brauchen; es gibt keine feste Laufzeit- oder Lag-Garantie.
+
+## Konfiguration
+
+`plugins/InselGen/config.yml`:
 
 ```yaml
 minimum-size: 50
 maximum-size: 500
+placement-backend: auto
 require-empty-space: true
 maximum-blocks: 12000000
 vegetation:
@@ -68,22 +94,23 @@ vegetation:
 teleport-after-generation: true
 ```
 
-Der Größenbereich kann innerhalb von 50–500 eingeschränkt werden. `require-empty-space: false` erlaubt ausdrücklich das Ersetzen von Blöcken im Inselvolumen. InselGen entfernt dabei keine Blöcke außerhalb seiner geplanten Form. Änderungen mit `/skyinsel reload` laden; laufende Aufträge behalten ihre bisherigen Einstellungen.
+`placement-backend` akzeptiert `auto`, `native` und `fawe`; eine Änderung benötigt einen Neustart. `fawe` ist auf Folia nicht verfügbar. Andere Einstellungen mit `/skyinsel reload` laden. Laufende Aufträge behalten ihre bisherigen Einstellungen. Ein vorhandenes Config-File ohne `placement-backend` verwendet automatisch `auto`.
 
 | Berechtigung | Standard | Funktion |
 | --- | --- | --- |
-| `inselgen.generate` | OP | Inseln erzeugen, Status und Hilfe, eigenen Auftrag abbrechen |
-| `inselgen.admin` | OP | Einstellungen neu laden, fremden Auftrag abbrechen; zusätzlich `inselgen.generate` nötig |
-| `worldedit.history.undo` | FAWE-Konfiguration | `//undo` benutzen |
+| `inselgen.generate` | OP | Inseln, Hilfe, Biomliste, Status, eigenes Cancel und Undo |
+| `inselgen.native` | OP | Native Platzierung und natives Undo |
+| `inselgen.admin` | OP | Reload und fremde Aufträge abbrechen; zusätzlich `inselgen.generate` erforderlich |
+| `worldedit.history.undo` | FAWE-Konfiguration | FAWE-Undo benutzen |
 
-## Selbst bauen und testen
+## Bauen und prüfen
 
-JDK 25 und Maven 3.9 oder neuer installieren:
+JDK 21 oder neuer und Maven 3.9 oder neuer:
 
 ```sh
 mvn -B -ntp verify
 ```
 
-Der Build verwendet feste Versionen von Paper-API (`26.3.build.244-stable`) und FAWE (`2.16.2`). Die Abhängigkeiten sind `provided` und werden nicht in die Plugin-JAR gepackt.
+Tests prüfen Seed-Reproduzierbarkeit, verbundene Formen, zulaufende Unterseiten, Größen bis 500, Vegetation, Befehle mit Biomoption, angepassten Sandboden, eindeutige Chunk-Zuordnung auch bei negativen Koordinaten, begrenzte und eindeutige Biomzellen sowie komprimierte Undo-Protokolle und nachträglich veränderte Blockzustände.
 
-Die automatisierten Tests prüfen unter anderem deterministische Seeds, unterschiedliche Umrisse, verbundene Inselkörper, zulaufende Unterseiten, Geländeunterschiede zwischen den Stilen, Größen bis 500, exakte Blockzählung, Vegetationsgrenzen, freie Spawnposition, Abbruch und ungültige Befehle. Sie ersetzen keine Prüfung mit dem eigenen Pluginbestand und den eigenen FAWE-Einstellungen.
+Die Kompatibilitätsprüfung verwendet echte Paper-1.21.1-/26.3- und Folia-1.21.4-/26.3-Testserver. Der Build kompiliert ausschließlich gegen die Spigot-1.21-API; Paper-spezifische Scheduler werden nur auf Folia per Reflexion angebunden. Ein direkter Spigot-Serverlauf ist gesondert zu prüfen. Weitere installierte Plugins und deren konkrete Gebietsschutz-Konfiguration sind nicht Teil dieser Tests.
