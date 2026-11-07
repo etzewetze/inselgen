@@ -35,3 +35,10 @@ ores:
 # Nach Fertigstellung sicher auf die Mitte der Insel setzen, sofern du noch
 # in derselben Welt bist. Der Bereich über der Inselmitte bleibt baumfrei.
 teleport-after-generation: true
+
+# Kleine Vorlagen werden vollständig dargestellt; große erhalten eine reduzierte
+# Oberflächenvorschau und einen Rahmen. confirm setzt stets die komplette Vorlage.
+# Änderungen dieser Vorschauoptionen benötigen einen Neustart.
+preview:
+  maximum-blocks: 4096
+  timeout-seconds: 300

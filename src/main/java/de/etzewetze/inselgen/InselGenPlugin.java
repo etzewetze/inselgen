@@ -10,6 +10,7 @@ public final class InselGenPlugin extends JavaPlugin {
     record Configuration(GenerationSettings settings, TreeLibrary trees) { }
     private volatile Configuration configuration;
     private GenerationService service;
+    private TemplateService templates;
 
     @Override
     public void onEnable() {
@@ -17,7 +18,8 @@ public final class InselGenPlugin extends JavaPlugin {
         if (!Files.exists(getDataFolder().toPath().resolve("trees/example_palm.yml"))) saveResource("trees/example_palm.yml", false);
         reloadSnapshot();
         service = new GenerationService(this);
-        IslandCommand handler = new IslandCommand(this, service);
+        templates = new TemplateService(this, service);
+        IslandCommand handler = new IslandCommand(this, service, templates);
         PluginCommand command = Objects.requireNonNull(getCommand("skyinsel"), "skyinsel fehlt in plugin.yml");
         command.setExecutor(handler);
         command.setTabCompleter(handler);
@@ -26,14 +28,19 @@ public final class InselGenPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (templates != null) templates.close();
         if (service != null) service.close();
     }
 
     Configuration configuration() { return configuration; }
+    synchronized void registerTree(de.etzewetze.inselgen.terrain.CustomTree tree) {
+        configuration = new Configuration(configuration.settings(), configuration.trees().with(tree));
+    }
 
     synchronized void reloadSettings() {
         reloadConfig();
         reloadSnapshot();
+        if (templates != null) templates.refresh();
     }
 
     private void reloadSnapshot() {

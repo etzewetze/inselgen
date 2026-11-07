@@ -6,7 +6,7 @@ folia-supported: true
 description: Zufällige Himmelsinseln mit Biomen, Vegetation, Seen, Erzen und Bossbar.
 author: etzewetze
 website: https://github.com/etzewetze/inselgen
-softdepend: [FastAsyncWorldEdit]
+softdepend: [FastAsyncWorldEdit, WorldEdit]
 commands:
   skyinsel:
     description: Erzeugt eine natürliche Himmelsinsel an deiner Position.
@@ -14,6 +14,12 @@ commands:
     usage: /skyinsel <50-500> [Seed] [Stil] [biome:beach] [tree:palm] [trees:30] [plants:8] [lakes:1] [ores:true]
     permission: inselgen.generate
 permissions:
+  inselgen.export:
+    description: Ausgewählte Bäume und Inseln als Vorlagen speichern.
+    default: op
+  inselgen.import:
+    description: Vorlagen mit Vorschau importieren, verschieben und bestätigen.
+    default: op
   inselgen.generate:
     description: Himmelsinseln erzeugen, Fortschritt abfragen und eigene Aufträge abbrechen.
     default: op

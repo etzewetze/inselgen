@@ -10,7 +10,7 @@ Natürliche, zufällige Himmelsinseln für **Spigot, Paper und Folia ab Minecraf
 
 ## Installation und Kompatibilität
 
-1. [inselgen-0.3.0.jar](https://github.com/etzewetze/inselgen/releases/download/v0.3.0/inselgen-0.3.0.jar) herunterladen und in `plugins/` legen. Beim Aktualisieren die alte InselGen-JAR ersetzen.
+1. [inselgen-0.4.0.jar](https://github.com/etzewetze/inselgen/releases/download/v0.4.0/inselgen-0.4.0.jar) herunterladen und in `plugins/` legen. Beim Aktualisieren die alte InselGen-JAR ersetzen.
 2. Den Server vollständig neu starten.
 3. Als OP im Spiel in freien Luftraum fliegen und `/skyinsel 100` ausprobieren.
 
@@ -24,7 +24,7 @@ Die JAR wird gegen die **Spigot-API 1.21** für **Java 21** gebaut. Neuere Serve
 
 Auf Folia wird normales FAWE nicht benötigt oder verwendet. Auf anderen Servern muss eine installierte FAWE-Version zur jeweiligen Minecraft-Version passen. Die FAWE-Anbindung kompiliert gegen API 2.11.2; der aktuelle Paper-26.3-Test verwendet FAWE 2.16.2.
 
-Die automatisierten Builds laufen mit Java 21. Nach `mvn verify` liegt die JAR unter `target/inselgen-0.3.0.jar`. GitHub Actions bietet sie im erfolgreichen Lauf als Artefakt **InselGen** an.
+Die automatisierten Builds laufen mit Java 21. Nach `mvn verify` liegt die JAR unter `target/inselgen-0.4.0.jar`. GitHub Actions bietet sie im erfolgreichen Lauf als Artefakt **InselGen** an.
 
 ## Befehle
 
@@ -44,7 +44,7 @@ Die automatisierten Builds laufen mit Java 21. Nach `mvn verify` liegt die JAR u
 | `/skyinsel trees` | Eingebaute und eigene Baumarten anzeigen |
 | `/skyinsel biomes [Suche]` | Verfügbare Biome des laufenden Servers anzeigen |
 | `/skyinsel status` | Aktuellen Fortschritt anzeigen |
-| `/skyinsel cancel` | Eigenen Auftrag abbrechen |
+| `/skyinsel cancel` | Eigene Vorschau verwerfen und eigenen Auftrag abbrechen |
 | `/skyinsel undo` | Letzten Auftrag rückgängig machen; bei FAWE wird dessen Undo aufgerufen |
 | `/skyinsel reload` | Konfiguration neu laden |
 | `/skyinsel help` | Kurzhilfe |
@@ -107,9 +107,80 @@ blocks:
   - {x: 0, y: 2, z: 0, block: 'minecraft:jungle_leaves'}
 ```
 
-Koordinaten sind relativ zum Stammfuß direkt über dem Boden. Pro Baum sind bis zu 4096 eindeutige Blöcke innerhalb X/Z −15…15 und Y 0…63 möglich; `(0,0,0)` ist erforderlich. Vanilla-Blockzustände wie `axis=x` werden übernommen, Blätter automatisch dauerhaft gesetzt. Luft und Flüssigkeiten sind als Baumblöcke ausgeschlossen. `soil` ist eine Liste erlaubter Bodenmaterialien aus der Inselpalette; ohne Angabe gelten Gras, Erde, Sand und Schneeblöcke. Namen müssen aus kleinen Buchstaben, Ziffern, `_` oder `-` bestehen, mit einem Buchstaben beginnen und maximal 32 Zeichen lang sein. Eingebaute Namen sind reserviert. Es sind bis zu 32 Dateien mit je höchstens 256 KiB möglich.
+Koordinaten sind relativ zum Stammfuß direkt über dem Boden. Pro Baum sind bis zu 4096 eindeutige Blöcke innerhalb X/Z −15…15 und Y 0…63 möglich; `(0,0,0)` ist erforderlich. Vanilla-Blockzustände wie `axis=x` werden übernommen, Blätter automatisch dauerhaft gesetzt. Luft und Flüssigkeiten sind als Baumblöcke ausgeschlossen. `soil` ist eine Liste erlaubter Bodenmaterialien aus der Inselpalette; ohne Angabe gelten Gras, Erde, Sand und Schneeblöcke. Namen müssen aus kleinen Buchstaben, Ziffern, `_` oder `-` bestehen, mit einem Buchstaben beginnen und maximal 32 Zeichen lang sein. Eingebaute Namen sind reserviert. Es sind bis zu 32 Dateien mit je höchstens 1 MiB möglich.
 
 Die Vorlagen enthalten Blockzustände, keine Inventare, Blockentitätsdaten oder `.schem`-Dateien. Sie funktionieren auch ohne FAWE auf Spigot, Paper und Folia. Ungültige Vorlagen werden beim Laden abgewiesen; ein fehlgeschlagenes Reload behält die bisher geladenen Einstellungen und Vorlagen.
+
+## Auswahl exportieren und mit Vorschau importieren
+
+Auf Paper/Spigot mit WorldEdit oder FAWE wird die vollständige **Quaderauswahl** übernommen: mit der Holzaxt markieren oder `//pos1` und `//pos2` verwenden. Auf allen Plattformen, auch Folia ohne WorldEdit, gibt es alternativ:
+
+```text
+/inselgen pos1
+/inselgen pos2
+```
+
+Die Befehle nehmen deine aktuelle Blockposition. Auch ausdrückliche oder relative Koordinaten sind möglich, beispielsweise `/inselgen pos1 100 150 100` und `/inselgen pos2 ~10 ~20 ~10`. Sobald eine eigene Position gesetzt wurde, hat diese Auswahl Vorrang. `/inselgen selection` zeigt ihre Größe; `/inselgen selection clear` löscht sie und aktiviert wieder die WorldEdit-Auswahl.
+
+### Baum speichern
+
+Nur den Baum einschließlich Stammfuß und Blättern markieren, ohne Boden:
+
+```text
+/inselgen export tree meine_palme
+```
+
+Der Export liest alle Nicht-Luftblöcke der Auswahl, erkennt den untersten Stammfuß möglichst nahe der Auswahlmitte und schreibt die vorhandene YAML-Vorlage nach `plugins/InselGen/trees/meine_palme.yml`. Stammachsen bleiben erhalten, Blätter werden dauerhaft. Die Baumauswahl darf höchstens 31×64×31 Blöcke umfassen und 4096 Nicht-Luftblöcke enthalten; die gespeicherten Blöcke müssen um den Stammfuß in X/Z ±15 passen. Vorhandene Namen werden nicht überschrieben.
+
+Der Baum ist sofort verfügbar, auch für zufällige Inseln:
+
+```text
+/skyinsel 200 biome:beach tree:meine_palme trees:50
+/inselgen import tree meine_palme
+```
+
+### Insel speichern
+
+Die gesamte Insel als Quader auswählen:
+
+```text
+/inselgen export insel meine_insel
+```
+
+Nicht-Luftblöcke einschließlich Wasser und Blockzuständen werden unter `plugins/InselGen/islands/meine_insel.insel` gespeichert. Das komprimierte Format verwendet eine Palette und Blockläufe. Auswahlgrenzen und Anker bleiben erhalten; Luft wird beim Import nicht gesetzt. Standardanker ist die Mitte in X/Z, direkt über dem höchsten Block dieser Mittelspalte; bei leerer Mittelspalte direkt über dem höchsten Block der Auswahl.
+
+Pro Auswahl gelten maximal 500 Blöcke in X/Z, 1024 in Y, insgesamt 64 Millionen Positionen einschließlich Luft sowie `maximum-blocks` für tatsächlich gespeicherte Blöcke. Zusätzlich gelten 4096 verschiedene Blockzustände, vier Millionen Blockläufe, 64 MiB pro Inseldatei und 128 Inseldateien. Exporte entstehen vollständig in einer temporären Datei und werden erst danach unter dem gewünschten Namen abgelegt. Bestehende Dateien bleiben erhalten.
+
+Die Funktion kopiert Blöcke und deren Zustände. **Biome und Entities werden nicht kopiert.** Blöcke mit Zusatzdaten, beispielsweise Kisten, Schilder oder Spawner, werden beim Export gemeldet und die Auswahl wird nicht gespeichert. So gehen Inventare oder Beschriftungen nicht unbemerkt verloren. Die ausgewählte Struktur während des Exports nicht bearbeiten; der Fortschritt steht in der Bossbar.
+
+### Vorschau verschieben und bestätigen
+
+```text
+/inselgen import insel meine_insel
+/inselgen move vor 5
+/inselgen move links 2
+/inselgen move hoch 3
+/inselgen confirm
+```
+
+`import tree <Name>` und `import insel <Name>` laden zuerst eine **Vorschau nur für den ausführenden Spieler**. Bis `confirm` werden keine echten Blöcke verändert. Ist ein Name eindeutig, funktioniert auch `/inselgen import <Name>`. `/inselgen templates` zeigt gespeicherte Bäume und Inseln. Neue manuell kopierte Dateien mit `/inselgen reload` einlesen.
+
+Die Vorlage startet mit ihrem Anker acht Blöcke vor dir auf Fußhöhe und wird bei Bedarf in die Bauhöhe geschoben. Beim Baum ist der Anker der Stammfuß, bei einer Insel die oben beschriebene Oberfläche. Klickbare Chatbuttons verschieben sie jeweils um einen Block. Für größere Schritte:
+
+| Befehl | Bewegung |
+| --- | --- |
+| `/inselgen move vor [1–100]` | Horizontal nach vorn |
+| `/inselgen move zurueck [1–100]` | Horizontal zurück |
+| `/inselgen move links [1–100]` | Nach links |
+| `/inselgen move rechts [1–100]` | Nach rechts |
+| `/inselgen move hoch [1–100]` | Nach oben |
+| `/inselgen move runter [1–100]` | Nach unten |
+| `/inselgen confirm` | Aktuelle Position prüfen und echte Blöcke setzen |
+| `/inselgen cancel` | Vorschau verwerfen; echte Blöcke bleiben unverändert |
+
+Horizontale Richtungen beziehen sich auf deine aktuelle Blickrichtung, auf die nächste Himmelsrichtung gerundet. Die Chatmeldung nennt den neuen Anker. Ein grüner Partikelrahmen markiert die Abmessungen. Kleine Vorlagen erscheinen vollständig; bei großen wird die obere und untere Oberfläche vereinfacht dargestellt. Vorschau-Blöcke werden im geladenen Umfeld des Spielers gezeigt; für andere Teile einer großen Insel näher heranfliegen. `confirm` setzt immer die **vollständige Vorlage**, einschließlich nicht dargestellter Blöcke.
+
+Die Vorschau reserviert keinen Platz. Bei `confirm` gelten die bisherigen Prüfungen auf freie Blöcke, Bauhöhe, Weltgrenze und Blocklimit sowie das gewählte Platzierungsbackend. Undo bleibt `/inselgen undo`, mit FAWE auch `//undo`. Bei Abbruch eines bereits laufenden Imports bleiben gesetzte Teile bis zum Undo bestehen. Die Vorschau verfällt nach fünf Minuten ohne Verschieben und wird beim Verlassen des Servers oder Weltwechsel entfernt. Höchstens vier Vorschauen sind gleichzeitig aktiv.
 
 ## Schutz, Abbruch und Undo
 
@@ -146,15 +217,20 @@ ores:
   enabled: true
   density: 35
 teleport-after-generation: true
+preview:
+  maximum-blocks: 4096
+  timeout-seconds: 300
 ```
 
-`placement-backend` akzeptiert `auto`, `native` und `fawe`; eine Änderung benötigt einen Neustart. `fawe` ist auf Folia nicht verfügbar. Andere Einstellungen mit `/skyinsel reload` laden. Laufende Aufträge behalten ihre bisherigen Einstellungen. Ein vorhandenes Config-File ohne `placement-backend` verwendet automatisch `auto`.
+`placement-backend` akzeptiert `auto`, `native` und `fawe`; eine Änderung benötigt einen Neustart. `fawe` ist auf Folia nicht verfügbar. Auch `preview.maximum-blocks` (128–16384) und `preview.timeout-seconds` (30–1800) benötigen einen Neustart. Andere Einstellungen mit `/skyinsel reload` laden. Laufende Aufträge behalten ihre bisherigen Einstellungen. Ein vorhandenes Config-File ohne `placement-backend` verwendet automatisch `auto`.
 
 Auch vorhandene Konfigurationen ohne die neuen Feature-Schlüssel verwenden deren oben gezeigte Standardwerte. `ores.density` ist der prozentuale Anteil der Ader-Kandidaten, kein Anteil aller Steinblöcke. Die alten Schalter `vegetation.trees` und `vegetation.plants` bleiben gültig; ausdrückliche Dichten im Befehl haben Vorrang.
 
 | Berechtigung | Standard | Funktion |
 | --- | --- | --- |
 | `inselgen.generate` | OP | Inseln, Hilfe, Biom-/Baumliste, Status, eigenes Cancel und Undo |
+| `inselgen.export` | OP | Auswahl setzen und Bäume/Inseln exportieren; zusätzlich `inselgen.generate` erforderlich |
+| `inselgen.import` | OP | Vorlagen auflisten, Vorschau laden/verschieben und bestätigen; zusätzlich `inselgen.generate` erforderlich |
 | `inselgen.native` | OP | Native Platzierung und natives Undo |
 | `inselgen.admin` | OP | Reload und fremde Aufträge abbrechen; zusätzlich `inselgen.generate` erforderlich |
 | `worldedit.history.undo` | FAWE-Konfiguration | FAWE-Undo benutzen |
@@ -168,5 +244,7 @@ mvn -B -ntp verify
 ```
 
 Tests prüfen Seed-Reproduzierbarkeit, verbundene Formen, zulaufende Unterseiten, Größen bis 500, Dichten und alle Baumarten, eigene Vorlagen, geschlossene Seen, Erzadern, Feature- und Biomoptionen, Fortschrittsphasen, eindeutige Chunk-Zuordnung auch bei negativen Koordinaten, begrenzte und eindeutige Biomzellen sowie komprimierte Undo-Protokolle und nachträglich veränderte Blockzustände.
+
+Weitere Tests prüfen Vorlagen-Roundtrips, beschädigte Dateien, Namen und Größenlimits, Schutz vorhandener Exporte, Stammfuß-Erkennung, Chunk-Aufteilung verschobener Vorlagen, Blockzustände, begrenzte Oberflächenvorschauen und alle Bewegungsrichtungen. Auf echten Testservern wird zusätzlich kontrolliert, dass Vorschau-Blöcke beim Client ankommen, die Welt vor `confirm` frei bleibt und nach Import/Undo die erwarteten Zustände enthält.
 
 Die Kompatibilitätsprüfung verwendet echte Paper-1.21.1-/26.3- und Folia-1.21.4-/26.3-Testserver. Der Build kompiliert ausschließlich gegen die Spigot-1.21-API; Paper-spezifische Scheduler werden nur auf Folia per Reflexion angebunden. Ein direkter Spigot-Serverlauf ist gesondert zu prüfen. Weitere installierte Plugins und deren konkrete Gebietsschutz-Konfiguration sind nicht Teil dieser Tests.

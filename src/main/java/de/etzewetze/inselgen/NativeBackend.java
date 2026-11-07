@@ -47,7 +47,7 @@ final class NativeBackend implements EditBackend {
         if (!context.settings().requireEmpty()) throw new IllegalArgumentException("Die native Platzierung benötigt require-empty-space: true. Zum Überschreiben bestehender Blöcke FAWE verwenden.");
         List<ChunkEdits.Part> parts = ChunkEdits.partition(context);
         Map<String, BlockData> custom = new HashMap<>();
-        job.begin(JobControl.Stage.PREFLIGHT, "Freien Luftraum prüfen", context.plan().blockCount());
+        job.begin(JobControl.Stage.PREFLIGHT, "Freien Luftraum prüfen", context.blockCount());
         for (var part : parts) {
             Iterator<ChunkEdits.BlockEdit> blocks = part.blocks(context);
             while (blocks.hasNext()) {
@@ -68,7 +68,7 @@ final class NativeBackend implements EditBackend {
         }
         job.check();
         Path directory = history.create(context.owner(), context.worldId());
-        job.begin(JobControl.Stage.PLACING, "Blöcke und Biom setzen", context.plan().blockCount());
+        job.begin(JobControl.Stage.PLACING, "Blöcke und Biom setzen", context.blockCount());
         boolean selected = false;
         for (var part : parts) {
             Iterator<ChunkEdits.BlockEdit> blocks = part.blocks(context);

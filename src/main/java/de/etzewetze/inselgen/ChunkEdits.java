@@ -18,8 +18,13 @@ final class ChunkEdits {
         BlockEdit(int x, int y, int z, IslandPlan.BlockKind kind) { this(x, y, z, kind, null); }
     }
     record BiomeCell(int x, int y, int z) { }
-    record Part(int x, int z, int minX, int minZ, int maxX, int maxZ, List<IslandPlan.Decoration> decorations) {
-        Iterator<BlockEdit> blocks(EditContext context) { return new Cursor(context, this); }
+    record Part(int x, int z, int minX, int minZ, int maxX, int maxZ, List<IslandPlan.Decoration> decorations, long[] runs) {
+        Part(int x, int z, int minX, int minZ, int maxX, int maxZ, List<IslandPlan.Decoration> decorations) {
+            this(x, z, minX, minZ, maxX, maxZ, decorations, new long[0]);
+        }
+        Iterator<BlockEdit> blocks(EditContext context) {
+            return context.structure() == null ? new Cursor(context, this) : context.structure().blocks(runs, context.originX(), context.originZ());
+        }
 
         List<BiomeCell> biomes(EditContext context) {
             if (context.biome() == null) return List.of();
@@ -40,6 +45,7 @@ final class ChunkEdits {
     }
 
     static List<Part> partition(EditContext context) {
+        if (context.structure() != null) return context.structure().partition(context.originX(), context.originZ());
         int size = context.plan().size(), ox = context.originX(), oz = context.originZ();
         Map<Long, List<IslandPlan.Decoration>> decorations = new HashMap<>();
         for (var d : context.plan().decorations()) decorations.computeIfAbsent(key((ox + d.x()) >> 4, (oz + d.z()) >> 4), ignored -> new ArrayList<>()).add(d);

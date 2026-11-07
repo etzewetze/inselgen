@@ -12,7 +12,7 @@ final class JobControl {
     volatile String phase = "Insel berechnen";
     volatile long done, total, changed, skipped;
     enum Stage {
-        PLANNING(0, .10), PREFLIGHT(.10, .40), PLACING(.40, .95), COMMITTING(.95, .99), UNDO(0, .99), COMPLETE(1, 1);
+        PLANNING(0, .10), EXPORT(0, .90), LOADING(0, .90), PREFLIGHT(.10, .40), PLACING(.40, .95), COMMITTING(.95, .99), UNDO(0, .99), COMPLETE(1, 1);
         final double start, end;
         Stage(double start, double end) { this.start = start; this.end = end; }
     }

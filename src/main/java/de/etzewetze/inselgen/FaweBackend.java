@@ -40,8 +40,8 @@ final class FaweBackend implements EditBackend {
             ParserContext parser = new ParserContext();
             parser.setActor(actor);
             parser.setWorld(world);
-            for (var decoration : context.plan().decorations()) if (decoration.blockData() != null && !custom.containsKey(decoration.blockData()))
-                custom.put(decoration.blockData(), WorldEdit.getInstance().getBlockFactory().parseFromInput(decoration.blockData(), parser).toImmutableState());
+            for (String state : context.customStates())
+                custom.put(state, WorldEdit.getInstance().getBlockFactory().parseFromInput(state, parser).toImmutableState());
             var biome = context.biome() == null ? null : BiomeTypes.get(context.request().biomeKey());
             if (context.biome() != null && biome == null) throw new IllegalArgumentException("FAWE kennt dieses Biom nicht: " + context.request().biomeKey());
             EditSession session = WorldEdit.getInstance().newEditSessionBuilder().world(world).actor(actor)
@@ -49,7 +49,7 @@ final class FaweBackend implements EditBackend {
             try {
                 var parts = ChunkEdits.partition(context);
                 if (context.settings().requireEmpty()) {
-                    job.begin(JobControl.Stage.PREFLIGHT, "Freien Luftraum prüfen", context.plan().blockCount());
+                    job.begin(JobControl.Stage.PREFLIGHT, "Freien Luftraum prüfen", context.blockCount());
                     for (var part : parts) {
                         var blocks = part.blocks(context);
                         while (blocks.hasNext()) {
@@ -60,7 +60,7 @@ final class FaweBackend implements EditBackend {
                         }
                     }
                 }
-                job.begin(JobControl.Stage.PLACING, "Blöcke und Biom setzen", context.plan().blockCount());
+                job.begin(JobControl.Stage.PLACING, "Blöcke und Biom setzen", context.blockCount());
                 for (var part : parts) {
                     var blocks = part.blocks(context);
                     while (blocks.hasNext()) {
