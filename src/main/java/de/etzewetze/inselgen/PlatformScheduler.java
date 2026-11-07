@@ -49,16 +49,17 @@ final class PlatformScheduler implements AutoCloseable {
 
     boolean isFolia() { return folia; }
 
-    <T> CompletableFuture<T> global(Supplier<T> task) { return submit(null, 0, 0, null, task); }
-    <T> CompletableFuture<T> chunk(World world, int x, int z, Supplier<T> task) { return submit(world, x, z, null, task); }
-    <T> CompletableFuture<T> entity(Player player, Supplier<T> task) { return submit(null, 0, 0, player, task); }
+    <T> CompletableFuture<T> global(Supplier<T> task) { return submit(null, 0, 0, null, task, 1); }
+    <T> CompletableFuture<T> chunk(World world, int x, int z, Supplier<T> task) { return submit(world, x, z, null, task, 1); }
+    <T> CompletableFuture<T> entity(Player player, Supplier<T> task) { return entityLater(player, task, 1); }
+    <T> CompletableFuture<T> entityLater(Player player, Supplier<T> task, long ticks) { return submit(null, 0, 0, player, task, ticks); }
 
     void teleport(Player player, Location location) {
         if (folia) invoke(teleport, player, location);
         else player.teleport(location);
     }
 
-    private <T> CompletableFuture<T> submit(World world, int x, int z, Player player, Supplier<T> task) {
+    private <T> CompletableFuture<T> submit(World world, int x, int z, Player player, Supplier<T> task, long ticks) {
         CompletableFuture<T> result = new CompletableFuture<>();
         pending.add(result);
         result.whenComplete((value, error) -> { pending.remove(result); running.remove(result); });
@@ -72,10 +73,10 @@ final class PlatformScheduler implements AutoCloseable {
         };
         if (closed) { result.cancel(false); return result; }
         try {
-            if (!folia) Bukkit.getScheduler().runTask(plugin, run);
+            if (!folia) Bukkit.getScheduler().runTaskLater(plugin, run, ticks);
             else if (player != null) {
                 Object scheduler = invoke(entityScheduler, player);
-                boolean scheduled = (boolean) invoke(entityExecute, scheduler, plugin, run, (Runnable) () -> result.cancel(false), 1L);
+                boolean scheduled = (boolean) invoke(entityExecute, scheduler, plugin, run, (Runnable) () -> result.cancel(false), ticks);
                 if (!scheduled) result.cancel(false);
             } else if (world != null) invoke(regionExecute, regions, plugin, world, x, z, run);
             else invoke(globalExecute, global, plugin, run);

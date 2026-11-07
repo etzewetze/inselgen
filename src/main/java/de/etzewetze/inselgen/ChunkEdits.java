@@ -14,7 +14,9 @@ import java.util.Set;
 
 /** Chunk partitions contain height maps and a few decorations, not millions of block objects. */
 final class ChunkEdits {
-    record BlockEdit(int x, int y, int z, IslandPlan.BlockKind kind) { }
+    record BlockEdit(int x, int y, int z, IslandPlan.BlockKind kind, String blockData) {
+        BlockEdit(int x, int y, int z, IslandPlan.BlockKind kind) { this(x, y, z, kind, null); }
+    }
     record BiomeCell(int x, int y, int z) { }
     record Part(int x, int z, int minX, int minZ, int maxX, int maxZ, List<IslandPlan.Decoration> decorations) {
         Iterator<BlockEdit> blocks(EditContext context) { return new Cursor(context, this); }
@@ -22,12 +24,15 @@ final class ChunkEdits {
         List<BiomeCell> biomes(EditContext context) {
             if (context.biome() == null) return List.of();
             Set<BiomeCell> cells = new HashSet<>();
+            Map<Long, Integer> decorationTops = new HashMap<>();
+            for (var decoration : decorations) decorationTops.merge(key(decoration.x(), decoration.z()), decoration.y(), Math::max);
             for (int z = minZ; z < maxZ; z++) for (int x = minX; x < maxX; x++) {
                 var column = context.plan().column(x, z);
                 if (column == null) continue;
                 int bx = Math.floorDiv(context.originX() + x, 4) * 4;
                 int bz = Math.floorDiv(context.originZ() + z, 4) * 4;
-                for (int y = Math.max(context.minY(), Math.floorDiv(column.bottom(), 4) * 4); y <= Math.min(context.maxY() - 1, column.top() + 8); y += 4)
+                int top = Math.max(column.top() + 8, decorationTops.getOrDefault(key(x, z), column.top()));
+                for (int y = Math.max(context.minY(), Math.floorDiv(column.bottom(), 4) * 4); y <= Math.min(context.maxY() - 1, top); y += 4)
                     cells.add(new BiomeCell(bx, y, bz));
             }
             return cells.stream().sorted(Comparator.comparingInt(BiomeCell::z).thenComparingInt(BiomeCell::x).thenComparingInt(BiomeCell::y)).toList();
@@ -68,7 +73,7 @@ final class ChunkEdits {
             }
             if (decoration < part.decorations().size()) {
                 var d = part.decorations().get(decoration++);
-                next = new BlockEdit(context.originX() + d.x(), d.y(), context.originZ() + d.z(), d.kind());
+                next = new BlockEdit(context.originX() + d.x(), d.y(), context.originZ() + d.z(), d.kind(), d.blockData());
             } else next = null;
         }
     }

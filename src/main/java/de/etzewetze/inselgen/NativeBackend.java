@@ -32,8 +32,11 @@ final class NativeBackend implements EditBackend {
     NativeBackend(InselGenPlugin plugin, PlatformScheduler scheduler) {
         this.scheduler = scheduler;
         history = new NativeHistory(plugin.getDataFolder().toPath().resolve("native-history"));
-        for (var kind : IslandPlan.BlockKind.values()) palette.put(kind, Material.valueOf(kind.name()).createBlockData());
-        palette.put(IslandPlan.BlockKind.OAK_LEAVES, Material.OAK_LEAVES.createBlockData("[persistent=true]"));
+        for (var kind : IslandPlan.BlockKind.values()) {
+            if (kind == IslandPlan.BlockKind.CUSTOM) continue;
+            Material material = Material.valueOf(kind.name());
+            palette.put(kind, kind.name().endsWith("_LEAVES") ? material.createBlockData("[persistent=true]") : material.createBlockData());
+        }
     }
 
     @Override public Prepared prepare(Player player) { return this::apply; }
@@ -43,7 +46,8 @@ final class NativeBackend implements EditBackend {
     private void apply(EditContext context, JobControl job) throws Exception {
         if (!context.settings().requireEmpty()) throw new IllegalArgumentException("Die native Platzierung benötigt require-empty-space: true. Zum Überschreiben bestehender Blöcke FAWE verwenden.");
         List<ChunkEdits.Part> parts = ChunkEdits.partition(context);
-        job.phase = "Freien Luftraum prüfen"; job.total = context.plan().blockCount(); job.done = 0;
+        Map<String, BlockData> custom = new HashMap<>();
+        job.begin(JobControl.Stage.PREFLIGHT, "Freien Luftraum prüfen", context.plan().blockCount());
         for (var part : parts) {
             Iterator<ChunkEdits.BlockEdit> blocks = part.blocks(context);
             while (blocks.hasNext()) {
@@ -64,7 +68,7 @@ final class NativeBackend implements EditBackend {
         }
         job.check();
         Path directory = history.create(context.owner(), context.worldId());
-        job.phase = "Blöcke und Biom setzen"; job.done = 0;
+        job.begin(JobControl.Stage.PLACING, "Blöcke und Biom setzen", context.plan().blockCount());
         boolean selected = false;
         for (var part : parts) {
             Iterator<ChunkEdits.BlockEdit> blocks = part.blocks(context);
@@ -72,7 +76,7 @@ final class NativeBackend implements EditBackend {
             try (NativeHistory.Writer writer = NativeHistory.writer(directory, part.x(), part.z())) {
                 while (blocks.hasNext()) {
                     job.check();
-                    BatchResult batch = job.await(scheduler.chunk(context.world(), part.x(), part.z(), () -> placeBatch(context, job, blocks)));
+                    BatchResult batch = job.await(scheduler.chunk(context.world(), part.x(), part.z(), () -> placeBatch(context, job, blocks, custom)));
                     writer.append(batch.changes());
                     if (!selected && !batch.changes().isEmpty()) { history.select(context.owner(), directory); selected = true; }
                     if (batch.failure() != null) throw batch.failure();
@@ -90,9 +94,10 @@ final class NativeBackend implements EditBackend {
                 job.check(); context.world().refreshChunk(part.x(), part.z()); return null;
             }));
         }
+        job.begin(JobControl.Stage.COMMITTING, "Historie abschließen", 1);
     }
 
-    private BatchResult placeBatch(EditContext context, JobControl job, Iterator<ChunkEdits.BlockEdit> edits) {
+    private BatchResult placeBatch(EditContext context, JobControl job, Iterator<ChunkEdits.BlockEdit> edits, Map<String, BlockData> custom) {
         List<NativeHistory.Change> changes = new ArrayList<>(BATCH);
         try {
             job.check();
@@ -101,7 +106,7 @@ final class NativeBackend implements EditBackend {
                 var edit = edits.next();
                 var block = context.world().getBlockAt(edit.x(), edit.y(), edit.z());
                 if (!block.getType().isAir()) throw new IllegalArgumentException("Der Bereich wurde während des Bauens verändert. Teilweise gebaute Insel: /skyinsel undo.");
-                BlockData data = palette.get(edit.kind());
+                BlockData data = edit.blockData() == null ? palette.get(edit.kind()) : custom.computeIfAbsent(edit.blockData(), Bukkit::createBlockData);
                 String before = block.getBlockData().getAsString();
                 block.setBlockData(data, false);
                 changes.add(new NativeHistory.Change(false, edit.x(), edit.y(), edit.z(), before, data.getAsString()));
@@ -132,7 +137,7 @@ final class NativeBackend implements EditBackend {
         if (world == null) throw new IllegalArgumentException("Die Welt der letzten Insel ist nicht geladen.");
         List<Path> files;
         try (var stream = Files.list(entry.directory())) { files = stream.filter(path -> path.getFileName().toString().endsWith(".gz")).sorted().toList(); }
-        job.phase = "Insel rückgängig machen"; job.total = files.size(); job.done = 0;
+        job.begin(JobControl.Stage.UNDO, "Insel rückgängig machen", files.size());
         Map<String, BlockData> states = new HashMap<>();
         for (Path file : files) {
             String[] coordinates = file.getFileName().toString().replace(".gz", "").split("_");
@@ -175,7 +180,7 @@ final class NativeBackend implements EditBackend {
     static boolean matchesGenerated(String current, String expected) {
         if (current.equals(expected)) return true;
         // Leaves update distance and grass updates snowy naturally, without a player edit.
-        if (expected.startsWith("minecraft:oak_leaves[") && current.startsWith("minecraft:oak_leaves["))
+        if (expected.matches("minecraft:[a-z_]+_leaves\\[.*") && current.startsWith(expected.substring(0, expected.indexOf('[') + 1)))
             return current.replaceAll("distance=[0-9]+", "distance=*").equals(expected.replaceAll("distance=[0-9]+", "distance=*"));
         if (expected.startsWith("minecraft:grass_block[") && current.startsWith("minecraft:grass_block["))
             return current.replaceAll("snowy=(true|false)", "snowy=*").equals(expected.replaceAll("snowy=(true|false)", "snowy=*"));

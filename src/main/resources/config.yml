@@ -17,6 +17,20 @@ maximum-blocks: 12000000
 vegetation:
   trees: true
   plants: true
+  # Anteil geeigneter Baumstandorte bzw. freier Grasblöcke in Prozent (0–100).
+  tree-density: 30
+  plant-density: 8
+  # auto = passend zum Biom; alternativ palm, birch, spruce, ... oder eigener Dateiname.
+  tree-type: auto
+
+lakes:
+  # 0 deaktiviert Seen. Bei ungeeignetem Gelände können weniger Seen entstehen.
+  count: 1
+
+ores:
+  enabled: true
+  # Anteil der unterirdischen Ader-Kandidaten (0–100), kein Anteil aller Blöcke.
+  density: 35
 
 # Nach Fertigstellung sicher auf die Mitte der Insel setzen, sofern du noch
 # in derselben Welt bist. Der Bereich über der Inselmitte bleibt baumfrei.

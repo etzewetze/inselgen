@@ -4,6 +4,7 @@ import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.LocalSession;
 import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
+import com.sk89q.worldedit.extension.input.ParserContext;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.biome.BiomeTypes;
 import com.sk89q.worldedit.world.block.BlockState;
@@ -12,6 +13,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 
 /** Loaded only when a compatible FAWE is enabled on a non-Folia server. */
@@ -19,8 +21,11 @@ final class FaweBackend implements EditBackend {
     private final Map<IslandPlan.BlockKind, BlockState> palette = new EnumMap<>(IslandPlan.BlockKind.class);
 
     FaweBackend() {
-        for (var kind : IslandPlan.BlockKind.values()) palette.put(kind, BukkitAdapter.adapt(Material.valueOf(kind.name()).createBlockData()));
-        palette.put(IslandPlan.BlockKind.OAK_LEAVES, BukkitAdapter.adapt(Material.OAK_LEAVES.createBlockData("[persistent=true]")));
+        for (var kind : IslandPlan.BlockKind.values()) {
+            if (kind == IslandPlan.BlockKind.CUSTOM) continue;
+            Material material = Material.valueOf(kind.name());
+            palette.put(kind, BukkitAdapter.adapt(kind.name().endsWith("_LEAVES") ? material.createBlockData("[persistent=true]") : material.createBlockData()));
+        }
     }
 
     @Override public String name() { return "FAWE"; }
@@ -31,6 +36,12 @@ final class FaweBackend implements EditBackend {
         var world = BukkitAdapter.adapt(player.getWorld());
         LocalSession history = WorldEdit.getInstance().getSessionManager().get(actor);
         return (context, job) -> {
+            Map<String, BlockState> custom = new HashMap<>();
+            ParserContext parser = new ParserContext();
+            parser.setActor(actor);
+            parser.setWorld(world);
+            for (var decoration : context.plan().decorations()) if (decoration.blockData() != null && !custom.containsKey(decoration.blockData()))
+                custom.put(decoration.blockData(), WorldEdit.getInstance().getBlockFactory().parseFromInput(decoration.blockData(), parser).toImmutableState());
             var biome = context.biome() == null ? null : BiomeTypes.get(context.request().biomeKey());
             if (context.biome() != null && biome == null) throw new IllegalArgumentException("FAWE kennt dieses Biom nicht: " + context.request().biomeKey());
             EditSession session = WorldEdit.getInstance().newEditSessionBuilder().world(world).actor(actor)
@@ -38,7 +49,7 @@ final class FaweBackend implements EditBackend {
             try {
                 var parts = ChunkEdits.partition(context);
                 if (context.settings().requireEmpty()) {
-                    job.phase = "Freien Luftraum prüfen"; job.done = 0; job.total = context.plan().blockCount();
+                    job.begin(JobControl.Stage.PREFLIGHT, "Freien Luftraum prüfen", context.plan().blockCount());
                     for (var part : parts) {
                         var blocks = part.blocks(context);
                         while (blocks.hasNext()) {
@@ -49,13 +60,13 @@ final class FaweBackend implements EditBackend {
                         }
                     }
                 }
-                job.phase = "Blöcke und Biom setzen"; job.done = 0; job.total = context.plan().blockCount();
+                job.begin(JobControl.Stage.PLACING, "Blöcke und Biom setzen", context.plan().blockCount());
                 for (var part : parts) {
                     var blocks = part.blocks(context);
                     while (blocks.hasNext()) {
                         job.check(); var block = blocks.next();
                         var position = BlockVector3.at(block.x(), block.y(), block.z());
-                        var state = palette.get(block.kind());
+                        var state = block.blockData() == null ? palette.get(block.kind()) : custom.get(block.blockData());
                         if (!session.setBlock(position, state) && !session.getBlock(position).equals(state))
                             throw new IllegalArgumentException("FAWE hat eine Änderung abgelehnt. Teilweise gebaute Insel: //undo.");
                         job.changed++; job.done++;
@@ -67,8 +78,8 @@ final class FaweBackend implements EditBackend {
                             throw new IllegalArgumentException("FAWE hat eine Biomänderung abgelehnt. Rückgängig: //undo.");
                     }
                 }
+                job.begin(JobControl.Stage.COMMITTING, "Änderungen abschließen", 1);
             } finally {
-                job.phase = "Änderungen abschließen";
                 try { session.close(); }
                 finally { history.remember(session); }
             }

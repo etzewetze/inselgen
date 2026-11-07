@@ -2,20 +2,17 @@ package de.etzewetze.inselgen.terrain;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.SplittableRandom;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
+import java.util.function.DoubleConsumer;
 
-import static de.etzewetze.inselgen.terrain.IslandPlan.BlockKind.*;
 import static de.etzewetze.inselgen.terrain.IslandPlan.Surface.*;
 
 /** Seed, size, style and vegetation flags fully determine the result, independent of world coordinates. */
 public final class IslandGenerator {
     private record Peak(double x, double z, double width, double height) { }
-    private record Position(int x, int y, int z) { }
 
     public IslandPlan generate(int size, int baseY, long seed, IslandStyle style,
                                boolean trees, boolean plants, BooleanSupplier cancelled) {
@@ -24,6 +21,11 @@ public final class IslandGenerator {
 
     public IslandPlan generate(int size, int baseY, long seed, IslandStyle style,
                                boolean trees, boolean plants, BiomeProfile biome, BooleanSupplier cancelled) {
+        return generate(size, baseY, seed, style, biome, GenerationFeatures.legacy(trees, plants), cancelled, ignored -> { });
+    }
+
+    public IslandPlan generate(int size, int baseY, long seed, IslandStyle style, BiomeProfile biome,
+                               GenerationFeatures features, BooleanSupplier cancelled, DoubleConsumer progress) {
         if (size < 50 || size > 500) throw new IllegalArgumentException("Größe muss zwischen 50 und 500 liegen");
         if (baseY < -4096 || baseY > 4096) throw new IllegalArgumentException("Ungültige Basishöhe");
         SplittableRandom random = new SplittableRandom(seed);
@@ -69,6 +71,7 @@ public final class IslandGenerator {
         Arrays.fill(bottoms, Integer.MIN_VALUE);
         for (int z = 0; z < size; z++) {
             checkCancelled(cancelled);
+            progress.accept(0.7 * z / size);
             for (int x = 0; x < size; x++) {
                 double nx = (x - center) / center, nz = (z - center) / center;
                 double angle = Math.atan2(nz, nx);
@@ -95,6 +98,9 @@ public final class IslandGenerator {
             }
         }
         keepConnectedFootprint(size, bottoms, cancelled);
+        int[] water = IslandPlan.emptyWater(size);
+        int lakes = LakeCarver.carve(size, tops, bottoms, water, features.lakes(), seed, cancelled);
+        progress.accept(0.8);
         for (int z = 0; z < size; z++) {
             checkCancelled(cancelled);
             for (int x = 0; x < size; x++) {
@@ -106,13 +112,17 @@ public final class IslandGenerator {
                     if (xx >= 0 && zz >= 0 && xx < size && zz < size && bottoms[zz * size + xx] != Integer.MIN_VALUE)
                         slope = Math.max(slope, Math.abs(tops[i] - tops[zz * size + xx]));
                 }
-                if (biome != BiomeProfile.DEFAULT) surfaces[i] = IslandPlan.Surface.valueOf(biome.name());
+                if (water[i] != Integer.MIN_VALUE) surfaces[i] = biome == BiomeProfile.SAND ? SAND : LAKE_BED;
+                else if (biome != BiomeProfile.DEFAULT) surfaces[i] = IslandPlan.Surface.valueOf(biome.name());
                 else if (style == IslandStyle.BERGIG && tops[i] > baseY + mountainHeight * 0.60 && slope <= 2) surfaces[i] = SNOW;
                 else surfaces[i] = slope >= 3 ? ROCK : GRASS;
             }
         }
-        List<IslandPlan.Decoration> decorations = decorate(size, tops, bottoms, surfaces, seed, trees, plants, cancelled);
-        return new IslandPlan(size, tops, bottoms, surfaces, decorations);
+        progress.accept(0.9);
+        List<IslandPlan.Decoration> decorations = VegetationGenerator.generate(size, tops, bottoms, water, surfaces, seed, features, cancelled);
+        OreField ores = features.ores() && features.oreDensity() > 0 ? new OreField(seed, features.oreDensity(), baseY) : null;
+        progress.accept(1);
+        return new IslandPlan(size, tops, bottoms, surfaces, decorations, water, ores, lakes);
     }
 
     private static final int[][] NEIGHBORS = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
@@ -138,58 +148,6 @@ public final class IslandGenerator {
             }
         }
         for (int i = 0; i < bottoms.length; i++) if (!visited[i]) bottoms[i] = Integer.MIN_VALUE;
-    }
-
-    private List<IslandPlan.Decoration> decorate(int size, int[] tops, int[] bottoms, IslandPlan.Surface[] surfaces,
-                                                long seed, boolean trees, boolean plants, BooleanSupplier cancelled) {
-        Map<Position, IslandPlan.BlockKind> blocks = new LinkedHashMap<>();
-        SplittableRandom random = new SplittableRandom(seed ^ 0x54EA3219L);
-        int center = size / 2;
-        if (trees) {
-            for (int z = 5; z < size - 5; z += 10) {
-                checkCancelled(cancelled);
-                for (int x = 5; x < size - 5; x += 10) {
-                    int tx = x + random.nextInt(-2, 3), tz = z + random.nextInt(-2, 3);
-                    int index = tz * size + tx;
-                    if (random.nextDouble() > 0.15 || surfaces[index] != GRASS || Math.hypot(tx - center, tz - center) < 6) continue;
-                    boolean fits = true;
-                    for (int dz = -3; dz <= 3; dz++) {
-                        for (int dx = -3; dx <= 3; dx++) {
-                            int neighbor = (tz + dz) * size + tx + dx;
-                            if (bottoms[neighbor] == Integer.MIN_VALUE || Math.abs(tops[neighbor] - tops[index]) > 1) fits = false;
-                        }
-                    }
-                    if (!fits) continue;
-                    int base = tops[index] + 1, height = random.nextInt(4, 7);
-                    for (int dy = height - 3; dy <= height + 1; dy++) {
-                        int radius = dy == height + 1 ? 1 : 2;
-                        for (int dz = -radius; dz <= radius; dz++) {
-                            for (int dx = -radius; dx <= radius; dx++) {
-                                if (dx * dx + dz * dz > radius * radius + 1) continue;
-                                blocks.putIfAbsent(new Position(tx + dx, base + dy, tz + dz), OAK_LEAVES);
-                            }
-                        }
-                    }
-                    for (int dy = 0; dy < height; dy++) blocks.put(new Position(tx, base + dy, tz), OAK_LOG);
-                }
-            }
-        }
-        if (plants) {
-            for (int z = 0; z < size; z++) {
-                checkCancelled(cancelled);
-                for (int x = 0; x < size; x++) {
-                    int i = z * size + x;
-                    if (surfaces[i] != GRASS || Math.hypot(x - center, z - center) < 2) continue;
-                    long value = SeededNoise.mix(seed ^ (x * 0x9E3779B97F4A7C15L) ^ (z * 0xC2B2AE3D27D4EB4FL));
-                    if (Math.floorMod(value, 100) < 5) {
-                        blocks.putIfAbsent(new Position(x, tops[i] + 1, z), Math.floorMod(value, 31) == 0 ? POPPY : SHORT_GRASS);
-                    }
-                }
-            }
-        }
-        List<IslandPlan.Decoration> result = new ArrayList<>(blocks.size());
-        blocks.forEach((p, kind) -> result.add(new IslandPlan.Decoration(p.x(), p.y(), p.z(), kind)));
-        return result;
     }
 
     private static void checkCancelled(BooleanSupplier cancelled) {
