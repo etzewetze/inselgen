@@ -17,10 +17,12 @@ import java.util.concurrent.ThreadLocalRandom;
 final class IslandCommand implements TabExecutor {
     private final InselGenPlugin plugin;
     private final GenerationService service;
+    private final TemplateService templates;
 
-    IslandCommand(InselGenPlugin plugin, GenerationService service) {
+    IslandCommand(InselGenPlugin plugin, GenerationService service, TemplateService templates) {
         this.plugin = plugin;
         this.service = service;
+        this.templates = templates;
     }
 
     @Override
@@ -35,6 +37,14 @@ final class IslandCommand implements TabExecutor {
             info(sender, "Vegetation: [tree:auto|palm|birch|…] [trees:0-100] [plants:0-100] [lakes:0-8] [ores:true|false]");
             info(sender, "Die Insel entsteht um deine Position. Fliege vorher in freien Luftraum.");
             info(sender, "/skyinsel status | /skyinsel cancel | /skyinsel biomes | /skyinsel trees | /skyinsel undo | /skyinsel reload");
+            info(sender, "/inselgen export <tree|insel> <Name> – WorldEdit-Auswahl oder eigene pos1/pos2 speichern");
+            info(sender, "/inselgen import [tree|insel] <Name> – Vorschau; /inselgen templates – gespeicherte Vorlagen");
+            info(sender, "/inselgen move <vor|zurueck|links|rechts|hoch|runter> [1–100] | /inselgen confirm | /inselgen cancel");
+            return true;
+        }
+        if (TemplateService.handles(args[0])) {
+            if (!(sender instanceof Player player)) error(sender, "Vorlagenbefehle bitte im Spiel ausführen.");
+            else try { templates.command(player, args); } catch (IllegalArgumentException | IllegalStateException error) { error(sender, error.getMessage()); }
             return true;
         }
         if (args[0].equalsIgnoreCase("status") && args.length == 1) {
@@ -42,8 +52,11 @@ final class IslandCommand implements TabExecutor {
             return true;
         }
         if (args[0].equalsIgnoreCase("cancel") && args.length == 1) {
-            if (!service.cancel(sender)) error(sender, "Kein eigener Auftrag aktiv; für fremde Aufträge ist inselgen.admin nötig.");
-            else info(sender, "Abbruch angefordert. Bereits gesetzte Änderungen nach Abschluss rückgängig: " + service.undoCommand());
+            boolean preview = sender instanceof Player player && templates.cancel(player);
+            boolean job = service.cancel(sender);
+            if (preview) info(sender, "Vorschau verworfen; nichts gebaut.");
+            if (job) info(sender, "Abbruch angefordert. Bereits gesetzte Änderungen nach Abschluss rückgängig: " + service.undoCommand());
+            else if (!preview) error(sender, "Keine eigene Vorschau oder kein Auftrag aktiv; für fremde Aufträge ist inselgen.admin nötig.");
             return true;
         }
         if (args[0].equalsIgnoreCase("biomes") && args.length <= 2) {
@@ -57,7 +70,7 @@ final class IslandCommand implements TabExecutor {
         }
         if (args[0].equalsIgnoreCase("undo") && args.length == 1) {
             if (!(sender instanceof Player player)) error(sender, "Undo bitte im Spiel ausführen.");
-            else try { service.undo(player); } catch (IllegalArgumentException | IllegalStateException error) { error(sender, error.getMessage()); }
+            else try { templates.cancelForPlacement(player); service.undo(player); } catch (IllegalArgumentException | IllegalStateException error) { error(sender, error.getMessage()); }
             return true;
         }
         if (args[0].equalsIgnoreCase("reload") && args.length == 1) {
@@ -77,6 +90,7 @@ final class IslandCommand implements TabExecutor {
             GenerationSettings settings = configuration.settings();
             GenerationArguments request = GenerationArguments.parse(args, settings.minimumSize(), settings.maximumSize(),
                     () -> ThreadLocalRandom.current().nextLong());
+            templates.cancelForPlacement(player);
             service.start(player, request, settings, configuration.trees());
         } catch (IllegalArgumentException | IllegalStateException error) {
             error(sender, error.getMessage());
@@ -88,8 +102,10 @@ final class IslandCommand implements TabExecutor {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (!sender.hasPermission("inselgen.generate")) return List.of();
         List<String> suggestions = new ArrayList<>();
+        if (args.length > 1 && TemplateService.handles(args[0])) return templates.complete(args);
         if (args.length == 1) {
             suggestions.addAll(List.of("50", "100", "150", "200", "300", "500", "help", "status", "cancel", "undo", "biomes", "trees"));
+            suggestions.addAll(List.of("export", "import", "confirm", "move", "pos1", "pos2", "selection", "templates"));
             if (sender.hasPermission("inselgen.admin")) suggestions.add("reload");
         } else if (args.length >= 2 && args.length <= 9 && args[0].matches("[0-9]+")) {
             boolean alreadyHasStyle = Arrays.stream(args, 1, args.length - 1).anyMatch(arg -> IslandStyle.parse(arg).isPresent());

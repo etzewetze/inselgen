@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
+import java.util.function.Consumer;
 
 final class GenerationService implements AutoCloseable, Listener {
     private final InselGenPlugin plugin;
@@ -61,6 +62,50 @@ final class GenerationService implements AutoCloseable, Listener {
 
     List<String> biomes() { return biomes; }
     String undoCommand() { return backend.undoCommand(); }
+    PlatformScheduler scheduler() { return scheduler; }
+
+    @FunctionalInterface interface Operation<T> { T run(JobControl control) throws Exception; }
+
+    <T> void operation(Player player, String description, Operation<T> work, Consumer<T> success) {
+        ensureAvailable();
+        Job job = activate(player, description);
+        worker.execute(() -> {
+            T result = null; String failure = null; boolean cancelled = false;
+            try { result = work.run(job.control()); job.control().complete(); }
+            catch (CancellationException error) { cancelled = true; }
+            catch (Exception error) { failure = describe(error); }
+            finally {
+                plugin.getLogger().info("Auftrag beendet: " + description + ", " + job.control().changed + " Blöcke");
+                T value = result; String message = failure; boolean stopped = cancelled;
+                active.compareAndSet(job, null);
+                if (!closing) scheduler.entity(player, () -> {
+                    finishDisplay(job, message == null && !stopped);
+                    if (message != null) IslandCommand.error(player, message + (job.control().changed > 0 ? " Rückgängig: " + undoCommand() : ""));
+                    else if (stopped) IslandCommand.info(player, "Auftrag abgebrochen." + (job.control().changed > 0 ? " Rückgängig: " + undoCommand() : ""));
+                    else success.accept(value);
+                    return null;
+                });
+            }
+        });
+    }
+
+    void place(Player player, String label, SavedStructure template, int x, int y, int z) {
+        ensureAvailable();
+        if (backend == nativeBackend && !player.hasPermission("inselgen.native")) throw new IllegalArgumentException("Dafür fehlt inselgen.native.");
+        World world = player.getWorld(); UUID worldId = world.getUID();
+        int minY = world.getMinHeight(), maxY = world.getMaxHeight();
+        if (y < minY || (long) y + template.height > maxY) throw new IllegalArgumentException("Vorlage überschreitet die Bauhöhe.");
+        var settings = plugin.configuration().settings();
+        if (template.blockCount() > settings.maximumBlocks()) throw new IllegalArgumentException("Vorlage überschreitet maximum-blocks.");
+        var prepared = backend.prepare(player);
+        var placement = new StructurePlacement(template, y);
+        var context = new EditContext(world, worldId, player.getUniqueId(), x, z, null, null, settings, null, minY, maxY, placement);
+        operation(player, "Import " + label, job -> {
+            job.await(scheduler.global(() -> { checkBorder(world, x, z, template.width, template.depth); return null; }));
+            prepared.apply(context, job);
+            return job.changed;
+        }, changed -> IslandCommand.info(player, "Vorlage gesetzt: " + label + ", " + changed + " Blöcke. Rückgängig: " + undoCommand()));
+    }
 
     void start(Player player, GenerationArguments request, GenerationSettings settings, TreeLibrary trees) {
         ensureAvailable();
@@ -146,9 +191,13 @@ final class GenerationService implements AutoCloseable, Listener {
     }
 
     private static void checkBorder(World world, int x, int z, int size) {
+        checkBorder(world, x, z, size, size);
+    }
+
+    private static void checkBorder(World world, int x, int z, int width, int depth) {
         var border = world.getWorldBorder(); var center = border.getCenter(); double half = border.getSize() / 2;
-        if (x < center.getX() - half || z < center.getZ() - half || (long) x + size > center.getX() + half || (long) z + size > center.getZ() + half
-                || x < -29_999_984 || z < -29_999_984 || (long) x + size > 29_999_984 || (long) z + size > 29_999_984)
+        if (x < center.getX() - half || z < center.getZ() - half || (long) x + width > center.getX() + half || (long) z + depth > center.getZ() + half
+                || x < -29_999_984 || z < -29_999_984 || (long) x + width > 29_999_984 || (long) z + depth > 29_999_984)
             throw new IllegalArgumentException("Die Insel würde die Weltgrenze überschreiten.");
     }
 

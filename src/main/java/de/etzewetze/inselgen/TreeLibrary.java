@@ -12,6 +12,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 /** Portable YAML trees; no WorldEdit classes, schematics or resource pack required. */
 final class TreeLibrary {
+    static final int MAX_FILE_SIZE = 1024 * 1024;
 
     private final Map<String, CustomTree> trees;
 
@@ -27,6 +28,12 @@ final class TreeLibrary {
         return trees.keySet().stream().sorted().toList();
     }
 
+    TreeLibrary with(CustomTree tree) {
+        Map<String, CustomTree> replacement = new HashMap<>(trees);
+        replacement.put(tree.id(), tree);
+        return new TreeLibrary(replacement);
+    }
+
     static TreeLibrary load(Path directory) {
         try {
             Files.createDirectories(directory);
@@ -40,7 +47,7 @@ final class TreeLibrary {
             }
             if (files.size() > 32) throw new IllegalArgumentException("Höchstens 32 eigene Baumdateien sind möglich");
             for (Path path : files) {
-                if (Files.size(path) > 262144) throw new IllegalArgumentException(
+                if (Files.size(path) > MAX_FILE_SIZE) throw new IllegalArgumentException(
                     "Baumdatei ist zu groß: " + path.getFileName()
                 );
                 String id = path.getFileName().toString().replaceFirst("\\.yml$", "");
