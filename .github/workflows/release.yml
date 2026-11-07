@@ -1,0 +1,65 @@
+name: Release InselGen
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-inselgen
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[release]')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build and test the release
+        run: mvn -B -ntp clean verify
+      - name: Check release version and notes
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(python3 -c 'import xml.etree.ElementTree as E; print(E.parse("pom.xml").getroot().find("{http://maven.apache.org/POM/4.0.0}version").text)')"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Only a numbered release version can be published: $VERSION"
+            exit 1
+          fi
+          test -f "target/inselgen-$VERSION.jar"
+          test -f "docs/releases/$VERSION.md"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Publish JAR and checksum to GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          (
+            cd target
+            sha256sum "inselgen-$RELEASE_VERSION.jar" > "inselgen-$RELEASE_VERSION.jar.sha256"
+          )
+          gh release create "v$RELEASE_VERSION" \
+            "target/inselgen-$RELEASE_VERSION.jar" \
+            "target/inselgen-$RELEASE_VERSION.jar.sha256" \
+            --target "$GITHUB_SHA" \
+            --title "InselGen $RELEASE_VERSION" \
+            --notes-file "docs/releases/$RELEASE_VERSION.md" \
+            --latest

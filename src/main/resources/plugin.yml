@@ -1,0 +1,25 @@
+name: InselGen
+version: '${project.version}'
+main: de.etzewetze.inselgen.InselGenPlugin
+api-version: '1.21'
+folia-supported: true
+description: Zufällige Himmelsinseln mit Biomauswahl für Spigot, Paper und Folia.
+author: etzewetze
+website: https://github.com/etzewetze/inselgen
+softdepend: [FastAsyncWorldEdit]
+commands:
+  skyinsel:
+    description: Erzeugt eine natürliche Himmelsinsel an deiner Position.
+    aliases: [inselgen]
+    usage: /skyinsel <50-500> [Seed] [natuerlich|bergig|flach] [biome:beach]
+    permission: inselgen.generate
+permissions:
+  inselgen.generate:
+    description: Himmelsinseln erzeugen, Fortschritt abfragen und eigene Aufträge abbrechen.
+    default: op
+  inselgen.admin:
+    description: Konfiguration neu laden und fremde Aufträge abbrechen.
+    default: op
+  inselgen.native:
+    description: Native Platzierung ohne FAWE-Gebietsschutz benutzen (nur für vertrauenswürdige Builder).
+    default: op
