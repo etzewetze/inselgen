@@ -1,0 +1,19 @@
+# Die Größe ist die maximale horizontale Ausdehnung, kein Radius.
+minimum-size: 50
+maximum-size: 500
+
+# Verhindert das Überschreiben bestehender Blöcke im gesamten geplanten Bauvolumen.
+# Auch Wasser, Pflanzen und Gebäude zählen als belegt. Nach der Prüfung können
+# andere Plugins/Spieler den Bereich weiterhin verändern; nicht parallel bauen.
+require-empty-space: true
+
+# Obergrenze pro Insel, einschließlich Bäumen und Pflanzen.
+maximum-blocks: 12000000
+
+vegetation:
+  trees: true
+  plants: true
+
+# Nach Fertigstellung sicher auf die Mitte der Insel setzen, sofern du noch
+# in derselben Welt bist. Der Bereich über der Inselmitte bleibt baumfrei.
+teleport-after-generation: true
